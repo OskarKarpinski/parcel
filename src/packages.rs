@@ -8,9 +8,9 @@ use anyhow::{Context, Result, anyhow, bail};
 use chrono::{SecondsFormat, Utc};
 use tempfile::{NamedTempFile, TempDir};
 
-use crate::actions::{apply_actions, cleanup_action_targets, remove_action_target};
-use crate::archive::{extract_payload, list_payload_files, read_parcel_archive};
-use crate::models::InstalledPackage;
+use crate::actions::{apply_actions, rollback_actions, uninstall_action};
+use crate::archive::{extract_payload, list_payload_files, read_parcel_archive, ParsedParcelArchive};
+use crate::models::{InstalledPackage, PackageDatabase, ResolvedAction};
 use crate::paths::Paths;
 use crate::repositories::{download_candidate, find_latest_candidate};
 use crate::storage::{load_database, save_database};
@@ -55,38 +55,52 @@ pub fn install_local_package(paths: &Paths, package_path: &Path, source_repo: &s
         .with_context(|| format!("create install directory {}", install_path.display()))?;
 
     let mut applied_actions = Vec::new();
-    let install_result = (|| {
-        extract_payload(&archive.data_path, archive.compression, &install_path)?;
-        let files = list_payload_files(&install_path)?;
-        applied_actions = apply_actions(paths, &install_path, &archive.manifest.actions)?;
-
-        db.packages.insert(
-            archive.manifest.name.clone(),
-            InstalledPackage {
-                name: archive.manifest.name.clone(),
-                version: archive.manifest.version.clone(),
-                arch: archive.manifest.arch.clone(),
-                install_path: install_path.clone(),
-                source_repo: source_repo.to_string(),
-                installed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
-                actions: applied_actions.clone(),
-                files,
-            },
-        );
-        save_database(paths, &db)
-    })();
-
-    if let Err(err) = install_result {
-        cleanup_action_targets(&applied_actions);
-        let _ = fs::remove_dir_all(&install_path);
-        return Err(err);
-    }
-
-    println!(
-        "installed {} {}",
-        archive.manifest.name, archive.manifest.version
+    let install_result = try_install(
+        paths, &mut db, &archive, &install_path, source_repo, &mut applied_actions,
     );
-    Ok(())
+
+    match install_result {
+        Ok(()) => {
+            println!(
+                "installed {} {}",
+                archive.manifest.name, archive.manifest.version
+            );
+            Ok(())
+        }
+        Err(err) => {
+            rollback_actions(&applied_actions);
+            let _ = fs::remove_dir_all(&install_path);
+            Err(err)
+        }
+    }
+}
+
+fn try_install(
+    paths: &Paths,
+    db: &mut PackageDatabase,
+    archive: &ParsedParcelArchive,
+    install_path: &Path,
+    source_repo: &str,
+    applied_actions: &mut Vec<ResolvedAction>,
+) -> Result<()> {
+    extract_payload(&archive.data_path, archive.compression, install_path)?;
+    let files = list_payload_files(install_path)?;
+    *applied_actions = apply_actions(paths, install_path, &archive.manifest.actions)?;
+
+    db.packages.insert(
+        archive.manifest.name.clone(),
+        InstalledPackage {
+            name: archive.manifest.name.clone(),
+            version: archive.manifest.version.clone(),
+            arch: archive.manifest.arch.clone(),
+            install_path: install_path.to_path_buf(),
+            source_repo: source_repo.to_string(),
+            installed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+            actions: applied_actions.clone(),
+            files,
+        },
+    );
+    save_database(paths, db)
 }
 
 pub fn install_remote_package(paths: &Paths, name: &str) -> Result<()> {
@@ -107,7 +121,7 @@ pub fn remove_package(paths: &Paths, name: &str) -> Result<()> {
         .ok_or_else(|| anyhow!("package is not installed: {name}"))?;
 
     for action in &package.actions {
-        remove_action_target(&package, action)?;
+        uninstall_action(&package, action)?;
     }
 
     if package.install_path.exists() {

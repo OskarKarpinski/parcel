@@ -19,10 +19,10 @@ pub fn apply_actions(
     let mut resolved = Vec::new();
 
     for action in actions {
-        match apply_action(paths, install_path, action) {
+        match apply_single_action(paths, install_path, action) {
             Ok(applied) => resolved.push(applied),
             Err(err) => {
-                cleanup_action_targets(&resolved);
+                rollback_actions(&resolved);
                 return Err(err);
             }
         }
@@ -31,7 +31,7 @@ pub fn apply_actions(
     Ok(resolved)
 }
 
-fn apply_action(paths: &Paths, install_path: &Path, action: &Action) -> Result<ResolvedAction> {
+fn apply_single_action(paths: &Paths, install_path: &Path, action: &Action) -> Result<ResolvedAction> {
     let source_relative = Path::new(&action.source);
     validate_relative_path(source_relative)?;
     let source = install_path.join(source_relative);
@@ -42,9 +42,9 @@ fn apply_action(paths: &Paths, install_path: &Path, action: &Action) -> Result<R
         );
     }
 
-    let target_root = target_root(paths, &action.target)?;
-    let target_relative = action_target_relative(&action.target, source_relative)?;
-    let target = target_root.join(target_relative);
+    let category_dir = category_directory(paths, &action.target)?;
+    let relative = target_relative_path(&action.target, source_relative)?;
+    let target = category_dir.join(relative);
 
     if target.exists() || fs::symlink_metadata(&target).is_ok() {
         bail!("refusing to overwrite existing path: {}", target.display());
@@ -79,43 +79,45 @@ fn apply_action(paths: &Paths, install_path: &Path, action: &Action) -> Result<R
     })
 }
 
-pub fn cleanup_action_targets(actions: &[ResolvedAction]) {
+pub fn rollback_actions(actions: &[ResolvedAction]) {
     for action in actions.iter().rev() {
         let _ = fs::remove_file(&action.resolved_target);
     }
 }
 
-pub fn remove_action_target(package: &InstalledPackage, action: &ResolvedAction) -> Result<()> {
+pub fn uninstall_action(package: &InstalledPackage, action: &ResolvedAction) -> Result<()> {
     let target = &action.resolved_target;
-    match fs::symlink_metadata(target) {
-        Ok(metadata) => {
-            if action.action_type == ActionType::Link {
-                if !metadata.file_type().is_symlink() {
-                    eprintln!("warning: not removing non-symlink {}", target.display());
-                    return Ok(());
-                }
-                let link_target = fs::read_link(target)
-                    .with_context(|| format!("read symlink {}", target.display()))?;
-                let expected = package.install_path.join(&action.source);
-                if link_target != expected {
-                    eprintln!(
-                        "warning: not removing symlink {} because it no longer points to {}",
-                        target.display(),
-                        expected.display()
-                    );
-                    return Ok(());
-                }
-            }
-            fs::remove_file(target).with_context(|| format!("remove {}", target.display()))?;
-        }
-        Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+
+    let metadata = match fs::symlink_metadata(target) {
+        Ok(m) => m,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(err) => return Err(err).with_context(|| format!("inspect {}", target.display())),
+    };
+
+    if action.action_type == ActionType::Link && !metadata.file_type().is_symlink() {
+        eprintln!("warning: not removing non-symlink {}", target.display());
+        return Ok(());
     }
-    Ok(())
+
+    if action.action_type == ActionType::Link {
+        let link_target = fs::read_link(target)
+            .with_context(|| format!("read symlink {}", target.display()))?;
+        let expected = package.install_path.join(&action.source);
+        if link_target != expected {
+            eprintln!(
+                "warning: not removing symlink {} because it no longer points to {}",
+                target.display(),
+                expected.display()
+            );
+            return Ok(());
+        }
+    }
+
+    fs::remove_file(target).with_context(|| format!("remove {}", target.display()))
 }
 
-fn target_root(paths: &Paths, target: &str) -> Result<PathBuf> {
-    match normalize_target(target).as_str() {
+fn category_directory(paths: &Paths, category: &str) -> Result<PathBuf> {
+    match normalize_category(category).as_str() {
         "bin" => Ok(paths.local_bin()),
         "applications" => Ok(paths.applications()),
         "icons" => Ok(paths.icons()),
@@ -124,19 +126,19 @@ fn target_root(paths: &Paths, target: &str) -> Result<PathBuf> {
     }
 }
 
-fn normalize_target(target: &str) -> String {
-    match target {
+fn normalize_category(category: &str) -> String {
+    match category {
         "desktop" => "applications".to_string(),
         other => other.to_string(),
     }
 }
 
 /// Preserve category-specific subpaths where XDG expects them.
-fn action_target_relative(target: &str, source: &Path) -> Result<PathBuf> {
-    let normalized = normalize_target(target);
+fn target_relative_path(category: &str, source: &Path) -> Result<PathBuf> {
+    let normalized = normalize_category(category);
     match normalized.as_str() {
-        "icons" => strip_known_prefix(source, Path::new("share/icons")),
-        "man" => strip_known_prefix(source, Path::new("share/man")),
+        "icons" => strip_path_prefix(source, Path::new("share/icons")),
+        "man" => strip_path_prefix(source, Path::new("share/man")),
         "bin" | "applications" => source
             .file_name()
             .map(PathBuf::from)
@@ -145,7 +147,7 @@ fn action_target_relative(target: &str, source: &Path) -> Result<PathBuf> {
     }
 }
 
-fn strip_known_prefix(source: &Path, prefix: &Path) -> Result<PathBuf> {
+fn strip_path_prefix(source: &Path, prefix: &Path) -> Result<PathBuf> {
     match source.strip_prefix(prefix) {
         Ok(stripped) if !stripped.as_os_str().is_empty() => Ok(stripped.to_path_buf()),
         _ => source

@@ -115,9 +115,9 @@ pub fn search_indexes(paths: &Paths, query: &str) -> Result<()> {
     }
 
     let mut found = false;
-    for (remote_name, index) in indexes {
-        for (package_name, package) in index.packages {
-            if package_matches(&package_name, &package, &query) {
+    for (remote_name, index) in &indexes {
+        for (package_name, package) in &index.packages {
+            if package_matches(package_name, package, &query) {
                 let latest = latest_version(package.versions.keys())
                     .unwrap_or_else(|| "unknown".to_string());
                 println!(
@@ -163,7 +163,7 @@ pub fn find_latest_candidate(paths: &Paths, name: &str) -> Result<Option<Package
 
         if best
             .as_ref()
-            .is_none_or(|current| crate::version::is_newer(&candidate.version, &current.version))
+            .map_or(true, |current| crate::version::is_newer(&candidate.version, &current.version))
         {
             best = Some(candidate);
         }

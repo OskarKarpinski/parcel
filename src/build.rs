@@ -172,19 +172,15 @@ fn create_build_workspace(build_dir: Option<&str>) -> Result<TempDir> {
 
 fn resolve_manifest_path(path: &Path) -> Result<PathBuf> {
     if path.is_dir() {
-        let mut candidates = Vec::new();
-        for entry in fs::read_dir(path).with_context(|| format!("read {}", path.display()))? {
-            let entry = entry.context("read package directory entry")?;
-            let entry_path = entry.path();
-            if matches!(
-                entry_path
-                    .extension()
-                    .and_then(|extension| extension.to_str()),
-                Some("yml" | "yaml")
-            ) {
-                candidates.push(entry_path);
-            }
-        }
+        let mut candidates: Vec<_> = fs::read_dir(path)
+            .with_context(|| format!("read {}", path.display()))?
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                let entry_path = entry.path();
+                let ext = entry_path.extension()?.to_str()?;
+                matches!(ext, "yml" | "yaml").then_some(entry_path)
+            })
+            .collect();
         candidates.sort();
         return match candidates.len() {
             0 => bail!("no .yml or .yaml manifest found in {}", path.display()),
