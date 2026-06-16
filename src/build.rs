@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -100,10 +100,24 @@ pub fn build_package(args: &BuildArgs) -> Result<()> {
         .unwrap_or_else(|| manifest_dir.to_path_buf());
     let output_path = output_dir.join(package_name);
 
+    print_build_header(
+        &build_manifest,
+        &manifest_path,
+        &arch,
+        args.release,
+        compression,
+        &output_path,
+    );
+
     let workspace = create_build_workspace(args.build_dir.as_deref())?;
     let source_dir = workspace.path().join("sources");
     let build_dir = workspace.path().join("build");
     let package_output_dir = workspace.path().join("output");
+    print_step("Preparing build workspace");
+    print_detail("workspace", workspace.path().display());
+    print_detail("sources", source_dir.display());
+    print_detail("build", build_dir.display());
+    print_detail("package output", package_output_dir.display());
     fs::create_dir_all(&source_dir).context("create source directory")?;
     fs::create_dir_all(&build_dir).context("create build directory")?;
     fs::create_dir_all(&package_output_dir).context("create package output directory")?;
@@ -125,7 +139,9 @@ pub fn build_package(args: &BuildArgs) -> Result<()> {
     )?;
 
     let actions = build_actions(&build_manifest.files, &package_output_dir)?;
+    print_step("Collecting package payload");
     let files = list_payload_files(&package_output_dir)?;
+    print_detail("payload files", files.len());
     if files.is_empty() {
         bail!("install_script produced no package files in $OUTPUT_DIR");
     }
@@ -139,6 +155,9 @@ pub fn build_package(args: &BuildArgs) -> Result<()> {
         actions,
     };
 
+    print_step("Writing package archive");
+    print_detail("compression", compression.data_file_name());
+    print_detail("output", output_path.display());
     fs::create_dir_all(&output_dir)
         .with_context(|| format!("create output directory {}", output_dir.display()))?;
     write_package_archive(
@@ -148,11 +167,40 @@ pub fn build_package(args: &BuildArgs) -> Result<()> {
         compression,
     )?;
 
-    println!("built {}", output_path.display());
+    print_step("Build complete");
+    print_detail("built", output_path.display());
     if build_manifest.delta {
-        println!("note: delta package generation is not implemented yet");
+        print_detail("note", "delta package generation is not implemented yet");
     }
     Ok(())
+}
+
+fn print_build_header(
+    manifest: &BuildManifest,
+    manifest_path: &Path,
+    arch: &str,
+    release: u64,
+    compression: CompressionName,
+    output_path: &Path,
+) {
+    print_step("Starting Parcel build");
+    print_detail("manifest", manifest_path.display());
+    print_detail("package", &manifest.name);
+    print_detail("version", &manifest.version);
+    print_detail("release", release);
+    print_detail("architecture", arch);
+    print_detail("compression", compression.data_file_name());
+    print_detail("sources", manifest.source.len());
+    print_detail("file groups", manifest.files.len());
+    print_detail("output", output_path.display());
+}
+
+fn print_step(message: &str) {
+    println!("==> {message}");
+}
+
+fn print_detail(label: &str, value: impl std::fmt::Display) {
+    println!("    {label}: {value}");
 }
 
 fn create_build_workspace(build_dir: Option<&str>) -> Result<TempDir> {
@@ -229,16 +277,36 @@ fn validate_build_request(manifest: &BuildManifest, arch: &str) -> Result<()> {
 }
 
 fn resolve_sources(entries: &[String], manifest_dir: &Path, source_dir: &Path) -> Result<()> {
+    print_step("Resolving sources");
+    if entries.is_empty() {
+        print_detail("sources", "none declared");
+        return Ok(());
+    }
+
     for entry in entries {
         let spec = parse_source_spec(entry);
+        if spec.location.starts_with("http://") || spec.location.starts_with("https://") {
+            print_detail("download", &spec.location);
+        } else {
+            print_detail(
+                "read",
+                source_location_display(&spec.location, manifest_dir).display(),
+            );
+        }
+
         let bytes = read_source_bytes(&spec.location, manifest_dir)?;
         if let Some(expected) = spec.checksum {
+            print_detail("verify blake2b", &spec.location);
             verify_blake2b(&bytes, &expected)
                 .with_context(|| format!("verify checksum for source {}", spec.location))?;
         }
 
         let file_name = source_file_name(&spec.location)?;
         let target = source_dir.join(file_name);
+        print_detail(
+            "write source",
+            format!("{} ({} bytes)", target.display(), bytes.len()),
+        );
         fs::write(&target, bytes).with_context(|| format!("write source {}", target.display()))?;
     }
     Ok(())
@@ -289,6 +357,19 @@ fn read_source_bytes(location: &str, manifest_dir: &Path) -> Result<Vec<u8>> {
     fs::read(&path).with_context(|| format!("read source {}", path.display()))
 }
 
+fn source_location_display(location: &str, manifest_dir: &Path) -> PathBuf {
+    if let Some(stripped) = location.strip_prefix("file://") {
+        PathBuf::from(stripped)
+    } else {
+        let path = Path::new(location);
+        if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            manifest_dir.join(path)
+        }
+    }
+}
+
 fn source_file_name(location: &str) -> Result<&str> {
     let trimmed = location.trim_end_matches('/');
     trimmed
@@ -306,27 +387,63 @@ fn run_script(
     label: &str,
 ) -> Result<()> {
     let Some(script) = script else {
+        print_step(&format!("Skipping {label}"));
+        print_detail("reason", "not declared");
         return Ok(());
     };
 
-    let status = Command::new("/bin/sh")
+    print_step(&format!("Running {label}"));
+    print_detail("cwd", build_dir.display());
+    print_detail("env SOURCE_DIR", source_dir.display());
+    print_detail("env OUTPUT_DIR", output_dir.display());
+    print_detail("command", "bash --noprofile --norc -x -c <script>");
+    print_script(script);
+    std::io::stdout()
+        .flush()
+        .context("flush build output before running script")?;
+
+    let status = Command::new("bash")
+        .arg("--noprofile")
+        .arg("--norc")
+        .arg("-x")
         .arg("-c")
         .arg(script)
         .current_dir(build_dir)
         .env("SOURCE_DIR", source_dir)
         .env("OUTPUT_DIR", output_dir)
+        .env_remove("BASH_ENV")
         .status()
-        .with_context(|| format!("run {label}"))?;
+        .with_context(|| format!("run {label} in {}", build_dir.display()))?;
 
     if !status.success() {
-        bail!("{label} failed with status {status}");
+        bail!(
+            "{label} failed with status {status} in {}",
+            build_dir.display()
+        );
     }
+    print_detail("status", status);
     Ok(())
 }
 
+fn print_script(script: &str) {
+    println!("    script:");
+    for line in script.lines() {
+        println!("      | {line}");
+    }
+}
+
 fn build_actions(files: &BTreeMap<String, Vec<String>>, output_dir: &Path) -> Result<Vec<Action>> {
+    print_step("Validating file actions");
+    if files.is_empty() {
+        print_detail("actions", "none declared");
+    }
+
     let mut actions = Vec::new();
     for (target, entries) in files {
+        print_detail(
+            "target group",
+            format!("{target} ({} entries)", entries.len()),
+        );
         for entry in entries {
             let action = parse_file_action(target, entry)?;
             let source = output_dir.join(&action.source);
@@ -336,9 +453,17 @@ fn build_actions(files: &BTreeMap<String, Vec<String>>, output_dir: &Path) -> Re
                     action.source
                 );
             }
+            print_detail(
+                "action",
+                format!(
+                    "{} -> {} ({:?})",
+                    action.source, action.target, action.action_type
+                ),
+            );
             actions.push(action);
         }
     }
+    print_detail("actions", actions.len());
     Ok(actions)
 }
 
