@@ -91,7 +91,8 @@ can be built with:
 cargo run -- build packages/example
 ```
 
-The default output directory is `dist/`. The generated archive name follows:
+By default, Parcel writes the built archive into the same directory as the
+package manifest. The generated archive name follows:
 
 ```text
 <name>-<version>-<release>-<arch>.parcel
@@ -100,7 +101,7 @@ The default output directory is `dist/`. The generated archive name follows:
 Example:
 
 ```text
-dist/example-1.0.0-1-x86_64.parcel
+packages/example/example-1.0.0-1-x86_64.parcel
 ```
 
 Useful build options:
@@ -181,7 +182,7 @@ source.
 Install a local package:
 
 ```bash
-cargo run -- install dist/example-1.0.0-1-x86_64.parcel
+cargo run -- install packages/example/example-1.0.0-1-x86_64.parcel
 ```
 
 List installed packages:

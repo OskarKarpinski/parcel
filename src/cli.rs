@@ -68,9 +68,9 @@ pub struct BuildArgs {
     /// Directory where Parcel creates its temporary build workspace.
     #[arg(long)]
     pub build_dir: Option<String>,
-    /// Directory where built .parcel archives are written.
-    #[arg(short, long, default_value = "dist")]
-    pub output_dir: String,
+    /// Directory where built .parcel archives are written. Defaults to the manifest directory.
+    #[arg(short, long)]
+    pub output_dir: Option<String>,
 }
 
 #[derive(Debug, Args)]

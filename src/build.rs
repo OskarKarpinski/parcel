@@ -93,7 +93,11 @@ pub fn build_package(args: &BuildArgs) -> Result<()> {
         "{}-{}-{}-{}.parcel",
         build_manifest.name, build_manifest.version, args.release, arch
     );
-    let output_dir = PathBuf::from(&args.output_dir);
+    let output_dir = args
+        .output_dir
+        .as_deref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| manifest_dir.to_path_buf());
     let output_path = output_dir.join(package_name);
 
     let workspace = create_build_workspace(args.build_dir.as_deref())?;
@@ -478,7 +482,7 @@ mod tests {
             release: 1,
             arch: None,
             build_dir: None,
-            output_dir: dist.to_string_lossy().into_owned(),
+            output_dir: Some(dist.to_string_lossy().into_owned()),
         })?;
 
         assert!(
