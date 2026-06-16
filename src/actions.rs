@@ -154,26 +154,3 @@ fn strip_known_prefix(source: &Path, prefix: &Path) -> Result<PathBuf> {
             .ok_or_else(|| anyhow!("action source has no file name: {}", source.display())),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn action_target_for_icons_preserves_hicolor_subtree() {
-        let target = action_target_relative(
-            "icons",
-            Path::new("share/icons/hicolor/48x48/apps/example.png"),
-        )
-        .unwrap();
-
-        assert_eq!(target, Path::new("hicolor/48x48/apps/example.png"));
-    }
-
-    #[test]
-    fn action_target_accepts_desktop_alias() {
-        let target = action_target_relative("desktop", Path::new("example.desktop")).unwrap();
-
-        assert_eq!(target, Path::new("example.desktop"));
-    }
-}

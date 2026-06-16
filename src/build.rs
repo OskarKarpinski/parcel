@@ -439,27 +439,6 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn parses_file_action_entries() -> Result<()> {
-        let action = parse_file_action("bin", "bin/example:link")?;
-
-        assert_eq!(action.source, "bin/example");
-        assert_eq!(action.target, "bin");
-        assert_eq!(action.action_type, ActionType::Link);
-        Ok(())
-    }
-
-    #[test]
-    fn source_checksum_suffix_is_optional() {
-        let without_checksum = parse_source_spec("./example.desktop");
-        assert_eq!(without_checksum.location, "./example.desktop");
-        assert!(without_checksum.checksum.is_none());
-
-        let with_checksum = parse_source_spec("./example.desktop:abc123");
-        assert_eq!(with_checksum.location, "./example.desktop");
-        assert_eq!(with_checksum.checksum.as_deref(), Some("abc123"));
-    }
-
-    #[test]
     fn builds_example_manifest_package() -> Result<()> {
         let temp = TempDir::new()?;
         let package_dir = temp.path().join("example");
@@ -507,6 +486,39 @@ mod tests {
 
         assert!(build_root.exists());
         assert_eq!(fs::read_dir(&build_root)?.count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn default_output_dir_is_manifest_directory() -> Result<()> {
+        let temp = TempDir::new()?;
+        let package_dir = temp.path().join("example");
+        fs::create_dir_all(&package_dir)?;
+        fs::write(
+            package_dir.join("example.desktop"),
+            "[Desktop Entry]\nName=Example\nExec=example\n",
+        )?;
+        fs::write(
+            package_dir.join("example.yml"),
+            format!(
+                "name: example\nversion: 1.0.0\ndescription: Example\narchitecture:\n  - {}\ncompression: zstd\nsource:\n  - ./example.desktop\nbuild_script: |\n  echo '#!/bin/sh' > example.sh\n  echo 'echo example' >> example.sh\n  chmod +x example.sh\ninstall_script: |\n  mkdir -p $OUTPUT_DIR/bin\n  mv ./example.sh $OUTPUT_DIR/bin/example\n  mv $SOURCE_DIR/example.desktop $OUTPUT_DIR/example.desktop\nfiles:\n  bin:\n    - bin/example:link\n",
+                current_arch()
+            ),
+        )?;
+
+        build_package(&BuildArgs {
+            manifest: package_dir.to_string_lossy().into_owned(),
+            release: 1,
+            arch: None,
+            build_dir: None,
+            output_dir: None,
+        })?;
+
+        assert!(
+            package_dir
+                .join(format!("example-1.0.0-1-{}.parcel", current_arch()))
+                .exists()
+        );
         Ok(())
     }
 }

@@ -3,6 +3,7 @@
 use anyhow::Result;
 use clap::Parser;
 
+#[cfg(feature = "build")]
 use crate::build::build_package;
 use crate::cli::{Cli, Command};
 use crate::packages::{
@@ -17,6 +18,7 @@ pub fn run() -> Result<()> {
 
     match cli.command {
         Command::Install(args) => install_command(&paths, &args.package),
+        #[cfg(feature = "build")]
         Command::Build(args) => build_package(&args),
         Command::Remove { name } => remove_package(&paths, &name),
         Command::List => list_installed(&paths),

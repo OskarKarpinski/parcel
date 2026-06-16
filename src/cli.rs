@@ -20,6 +20,7 @@ pub enum Command {
     /// Install a local .parcel archive or a package from configured remotes.
     Install(InstallArgs),
     /// Build a .parcel archive from a package build manifest.
+    #[cfg(feature = "build")]
     Build(BuildArgs),
     /// Remove an installed package by name.
     Remove {
@@ -56,6 +57,7 @@ pub struct InstallArgs {
 }
 
 #[derive(Debug, Args)]
+#[cfg(feature = "build")]
 pub struct BuildArgs {
     /// Path to a package directory or build manifest YAML file.
     pub manifest: String,

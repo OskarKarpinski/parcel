@@ -10,7 +10,6 @@ The detailed package format specification lives in [Parcel.md](Parcel.md).
 
 Parcel currently supports:
 
-- Building `.parcel` archives from YAML package manifests
 - Installing local `.parcel` archives
 - Installing packages from cached remote indexes
 - Removing installed packages cleanly
@@ -20,6 +19,9 @@ Parcel currently supports:
 - Upgrading installed packages from remotes
 - Managing remote repositories
 
+When compiled with the `build` feature, Parcel also supports building `.parcel`
+archives from YAML package manifests.
+
 Delta packages are reserved in the format but are not implemented yet.
 
 ## Install From Source
@@ -28,6 +30,12 @@ Build the binary with Cargo:
 
 ```bash
 cargo build --release
+```
+
+Build with package-authoring support enabled:
+
+```bash
+cargo build --release --features build
 ```
 
 Run it from the build output:
@@ -46,7 +54,6 @@ cargo run -- --help
 
 ```bash
 parcel install <package>
-parcel build [options] <manifest-or-package-dir>
 parcel remove <name>
 parcel list
 parcel info <name>
@@ -56,6 +63,12 @@ parcel upgrade [name] [--yes]
 parcel remote add <name> <url>
 parcel remote remove <name>
 parcel remote list
+```
+
+When compiled with `--features build`, the CLI also includes:
+
+```bash
+parcel build [options] <manifest-or-package-dir>
 ```
 
 `<package>` can be either a path to a local `.parcel` archive or a package name
@@ -85,10 +98,10 @@ $HOME/.local/share/man/
 ## Build A Package
 
 Package manifests live naturally under `packages/<name>/`. The example package
-can be built with:
+can be built when Parcel is compiled with the `build` feature:
 
 ```bash
-cargo run -- build packages/example
+cargo run --features build -- build packages/example
 ```
 
 By default, Parcel writes the built archive into the same directory as the
@@ -107,10 +120,10 @@ packages/example/example-1.0.0-1-x86_64.parcel
 Useful build options:
 
 ```bash
-cargo run -- build packages/example --release 2
-cargo run -- build packages/example --arch x86_64
-cargo run -- build packages/example --output-dir /tmp/parcel-dist
-cargo run -- build packages/example --build-dir /tmp/parcel-build
+cargo run --features build -- build packages/example --release 2
+cargo run --features build -- build packages/example --arch x86_64
+cargo run --features build -- build packages/example --output-dir /tmp/parcel-dist
+cargo run --features build -- build packages/example --build-dir /tmp/parcel-build
 ```
 
 `--build-dir` selects where Parcel creates its temporary build workspace. Parcel

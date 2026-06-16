@@ -8,6 +8,7 @@
 
 mod actions;
 mod archive;
+#[cfg(feature = "build")]
 mod build;
 mod cli;
 mod commands;

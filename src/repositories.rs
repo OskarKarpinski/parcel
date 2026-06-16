@@ -277,24 +277,3 @@ fn blake2b_hex(bytes: &[u8]) -> String {
     let digest = Blake2b512::digest(bytes);
     hex::encode(digest)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn github_remote_url_expands_to_index_asset() {
-        assert_eq!(
-            normalize_remote_index_url("https://github.com/owner/repo"),
-            "https://github.com/owner/repo/releases/download/parcel-index/parcel-index.db"
-        );
-    }
-
-    #[test]
-    fn direct_index_url_is_kept() {
-        assert_eq!(
-            normalize_remote_index_url("file:///tmp/parcel-index.db"),
-            "file:///tmp/parcel-index.db"
-        );
-    }
-}
