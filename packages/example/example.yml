@@ -1,0 +1,30 @@
+name: example
+version: 1.0.0
+description: Example parcel package
+architecture:
+  - x86_64
+  - aarch64
+
+delta: false
+compression: zstd # zstd or xz (default zstd)
+
+source:
+  # - https://example.com/test.tar.gz
+  - ./example.desktop
+
+build_script: |
+  echo "Building..."
+  echo "#!/bin/bash" > example.sh
+  echo "echo \"Hello World\"" >> example.sh
+  chmod +x example.sh
+
+install_script: |
+  mkdir -p $OUTPUT_DIR/bin
+  mv ./example.sh $OUTPUT_DIR/bin/example
+  mv $SOURCE_DIR/example.desktop $OUTPUT_DIR/example.desktop
+
+files:
+  bin:
+    - bin/example:link
+  desktop:
+    - example.desktop:copy
