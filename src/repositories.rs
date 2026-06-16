@@ -163,7 +163,7 @@ pub fn find_latest_candidate(paths: &Paths, name: &str) -> Result<Option<Package
 
         if best
             .as_ref()
-            .map_or(true, |current| crate::version::is_newer(&candidate.version, &current.version))
+            .is_none_or(|current| crate::version::is_newer(&candidate.version, &current.version))
         {
             best = Some(candidate);
         }

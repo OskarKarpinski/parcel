@@ -9,7 +9,9 @@ use chrono::{SecondsFormat, Utc};
 use tempfile::{NamedTempFile, TempDir};
 
 use crate::actions::{apply_actions, rollback_actions, uninstall_action};
-use crate::archive::{extract_payload, list_payload_files, read_parcel_archive, ParsedParcelArchive};
+use crate::archive::{
+    ParsedParcelArchive, extract_payload, list_payload_files, read_parcel_archive,
+};
 use crate::models::{InstalledPackage, PackageDatabase, ResolvedAction};
 use crate::paths::Paths;
 use crate::repositories::{download_candidate, find_latest_candidate};
@@ -56,7 +58,12 @@ pub fn install_local_package(paths: &Paths, package_path: &Path, source_repo: &s
 
     let mut applied_actions = Vec::new();
     let install_result = try_install(
-        paths, &mut db, &archive, &install_path, source_repo, &mut applied_actions,
+        paths,
+        &mut db,
+        &archive,
+        &install_path,
+        source_repo,
+        &mut applied_actions,
     );
 
     match install_result {

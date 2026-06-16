@@ -31,7 +31,11 @@ pub fn apply_actions(
     Ok(resolved)
 }
 
-fn apply_single_action(paths: &Paths, install_path: &Path, action: &Action) -> Result<ResolvedAction> {
+fn apply_single_action(
+    paths: &Paths,
+    install_path: &Path,
+    action: &Action,
+) -> Result<ResolvedAction> {
     let source_relative = Path::new(&action.source);
     validate_relative_path(source_relative)?;
     let source = install_path.join(source_relative);
@@ -100,8 +104,8 @@ pub fn uninstall_action(package: &InstalledPackage, action: &ResolvedAction) -> 
     }
 
     if action.action_type == ActionType::Link {
-        let link_target = fs::read_link(target)
-            .with_context(|| format!("read symlink {}", target.display()))?;
+        let link_target =
+            fs::read_link(target).with_context(|| format!("read symlink {}", target.display()))?;
         let expected = package.install_path.join(&action.source);
         if link_target != expected {
             eprintln!(
