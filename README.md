@@ -149,6 +149,12 @@ compression: zstd
 source:
   - ./example.desktop
 
+source-x86-64:
+  - https://example.com/bin-x86_64.zip:abc123...
+
+source-aarch64:
+  - https://example.com/bin-aarch64.zip:def456...
+
 build_script: |
   echo "Building..."
   echo "#!/bin/bash" > example.sh
@@ -189,6 +195,23 @@ source:
 
 If no checksum suffix is present, Parcel skips source verification for that
 source.
+
+Architecture-specific sources can be declared next to shared sources:
+
+```yaml
+source:
+  - ./common.desktop
+
+source-x86-64:
+  - https://example.com/bin.zip:abc123...
+
+source-aarch64:
+  - https://example.com/bin-aarch64.zip:def456...
+```
+
+`source` entries are always resolved. `source-x86-64` is resolved only when
+building for `x86_64`, and `source-aarch64` is resolved only when building for
+`aarch64`. `source-x86_64` is also accepted as an alias.
 
 ## Install And Remove
 

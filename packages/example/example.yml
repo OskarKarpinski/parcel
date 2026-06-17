@@ -12,6 +12,12 @@ source:
   # - https://example.com/test.tar.gz
   - ./example.desktop
 
+# source-x86-64:
+#   - https://example.com/bin-x86_64.zip:abc123...
+#
+# source-aarch64:
+#   - https://example.com/bin-aarch64.zip:abc123...
+
 build_script: |
   echo "Building..."
   echo "#!/bin/bash" > example.sh

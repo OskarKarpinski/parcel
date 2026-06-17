@@ -39,6 +39,10 @@ struct BuildManifest {
     compression: Option<CompressionName>,
     #[serde(default)]
     source: Vec<String>,
+    #[serde(default, rename = "source-x86-64", alias = "source-x86_64")]
+    source_x86_64: Vec<String>,
+    #[serde(default, rename = "source-aarch64")]
+    source_aarch64: Vec<String>,
     #[serde(default)]
     build_script: Option<String>,
     #[serde(default)]
@@ -86,6 +90,7 @@ pub fn build_package(args: &BuildArgs) -> Result<()> {
     let arch = args.arch.clone().unwrap_or_else(current_arch);
 
     validate_build_request(&build_manifest, &arch)?;
+    let source_entries = source_entries_for_arch(&build_manifest, &arch);
 
     let compression = build_manifest.compression.unwrap_or(CompressionName::Zstd);
     let release_version = format!("{}-{}", build_manifest.version, args.release);
@@ -107,6 +112,7 @@ pub fn build_package(args: &BuildArgs) -> Result<()> {
         args.release,
         compression,
         &output_path,
+        source_entries.len(),
     );
 
     let workspace = create_build_workspace(args.build_dir.as_deref())?;
@@ -122,7 +128,7 @@ pub fn build_package(args: &BuildArgs) -> Result<()> {
     fs::create_dir_all(&build_dir).context("create build directory")?;
     fs::create_dir_all(&package_output_dir).context("create package output directory")?;
 
-    resolve_sources(&build_manifest.source, manifest_dir, &source_dir)?;
+    resolve_sources(&source_entries, manifest_dir, &source_dir)?;
     run_script(
         build_manifest.build_script.as_deref(),
         &build_dir,
@@ -182,6 +188,7 @@ fn print_build_header(
     release: u64,
     compression: CompressionName,
     output_path: &Path,
+    source_count: usize,
 ) {
     print_step("Starting Parcel build");
     print_detail("manifest", manifest_path.display());
@@ -190,7 +197,7 @@ fn print_build_header(
     print_detail("release", release);
     print_detail("architecture", arch);
     print_detail("compression", compression.data_file_name());
-    print_detail("sources", manifest.source.len());
+    print_detail("sources", source_count);
     print_detail("file groups", manifest.files.len());
     print_detail("output", output_path.display());
 }
@@ -276,7 +283,17 @@ fn validate_build_request(manifest: &BuildManifest, arch: &str) -> Result<()> {
     Ok(())
 }
 
-fn resolve_sources(entries: &[String], manifest_dir: &Path, source_dir: &Path) -> Result<()> {
+fn source_entries_for_arch<'a>(manifest: &'a BuildManifest, arch: &str) -> Vec<&'a str> {
+    let mut entries: Vec<_> = manifest.source.iter().map(String::as_str).collect();
+    match arch {
+        "x86_64" => entries.extend(manifest.source_x86_64.iter().map(String::as_str)),
+        "aarch64" => entries.extend(manifest.source_aarch64.iter().map(String::as_str)),
+        _ => {}
+    }
+    entries
+}
+
+fn resolve_sources(entries: &[&str], manifest_dir: &Path, source_dir: &Path) -> Result<()> {
     print_step("Resolving sources");
     if entries.is_empty() {
         print_detail("sources", "none declared");
@@ -640,6 +657,49 @@ mod tests {
                 .join(format!("example-1.0.0-1-{}.parcel", current_arch()))
                 .exists()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn source_entries_include_selected_architecture_sources() -> Result<()> {
+        let manifest: BuildManifest = serde_yaml::from_str(
+            "name: example\nversion: 1.0.0\ndescription: Example\narchitecture:\n  - x86_64\n  - aarch64\nsource:\n  - ./common.txt\nsource-x86-64:\n  - ./x86.txt\nsource-aarch64:\n  - ./arm.txt\n",
+        )?;
+
+        assert_eq!(
+            source_entries_for_arch(&manifest, "x86_64"),
+            vec!["./common.txt", "./x86.txt"]
+        );
+        assert_eq!(
+            source_entries_for_arch(&manifest, "aarch64"),
+            vec!["./common.txt", "./arm.txt"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn build_resolves_only_selected_architecture_sources() -> Result<()> {
+        let temp = TempDir::new()?;
+        let package_dir = temp.path().join("example");
+        fs::create_dir_all(&package_dir)?;
+        fs::write(package_dir.join("common.txt"), "common")?;
+        fs::write(package_dir.join("x86.txt"), "x86")?;
+        fs::write(package_dir.join("arm.txt"), "arm")?;
+        fs::write(
+            package_dir.join("example.yml"),
+            "name: example\nversion: 1.0.0\ndescription: Example\narchitecture:\n  - x86_64\n  - aarch64\ncompression: zstd\nsource:\n  - ./common.txt\nsource-x86-64:\n  - ./x86.txt\nsource-aarch64:\n  - ./arm.txt\ninstall_script: |\n  test -f $SOURCE_DIR/common.txt\n  test -f $SOURCE_DIR/x86.txt\n  test ! -e $SOURCE_DIR/arm.txt\n  mkdir -p $OUTPUT_DIR/bin\n  cp $SOURCE_DIR/x86.txt $OUTPUT_DIR/bin/example\nfiles:\n  bin:\n    - bin/example:link\n",
+        )?;
+
+        let dist = temp.path().join("dist");
+        build_package(&BuildArgs {
+            manifest: package_dir.to_string_lossy().into_owned(),
+            release: 1,
+            arch: Some("x86_64".to_string()),
+            build_dir: None,
+            output_dir: Some(dist.to_string_lossy().into_owned()),
+        })?;
+
+        assert!(dist.join("example-1.0.0-1-x86_64.parcel").exists());
         Ok(())
     }
 }
