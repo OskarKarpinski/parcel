@@ -58,8 +58,7 @@ parcel remove <name>
 parcel list
 parcel info <name>
 parcel search <query>
-parcel update
-parcel upgrade [name] [--yes]
+parcel update [name] [--yes]
 parcel remote add <name> <url>
 parcel remote remove <name>
 parcel remote list
@@ -254,7 +253,7 @@ to:
 https://github.com/<owner>/<repo>/releases/download/parcel-index/parcel-index.db
 ```
 
-Update cached indexes:
+Update cached indexes and installed packages:
 
 ```bash
 parcel update
@@ -272,17 +271,13 @@ Install a package from cached remotes:
 parcel install example
 ```
 
-Upgrade all installed packages:
+Update one installed package:
 
 ```bash
-parcel upgrade
+parcel update example
 ```
 
-Upgrade one package without prompting:
-
-```bash
-parcel upgrade example --yes
-```
+Add `--yes` to apply available package updates without prompting.
 
 ## Package Archive Format
 

@@ -1,8 +1,8 @@
 //! Command-line interface definitions.
 //!
 //! The CLI mirrors the package-manager operations users expect: install,
-//! remove, list, search, update metadata, inspect package details, upgrade, and
-//! manage remote repositories.
+//! remove, list, search, update metadata and packages, inspect package details,
+//! and manage remote repositories.
 
 use clap::{Args, Parser, Subcommand};
 
@@ -39,10 +39,8 @@ pub enum Command {
         /// Case-insensitive package name, homepage, or description fragment.
         query: String,
     },
-    /// Download and cache package indexes from configured remotes.
-    Update,
-    /// Upgrade one installed package, or all installed packages.
-    Upgrade(UpgradeArgs),
+    /// Update remote indexes, then update one installed package or all installed packages.
+    Update(UpdateArgs),
     /// Manage remote repositories.
     Remote {
         #[command(subcommand)]
@@ -76,10 +74,10 @@ pub struct BuildArgs {
 }
 
 #[derive(Debug, Args)]
-pub struct UpgradeArgs {
-    /// Optional installed package name. If omitted, all installed packages are checked.
+pub struct UpdateArgs {
+    /// Optional installed package name. If omitted, all installed packages are updated.
     pub name: Option<String>,
-    /// Run without asking for confirmation.
+    /// Run package updates without asking for confirmation.
     #[arg(short, long)]
     pub yes: bool,
 }

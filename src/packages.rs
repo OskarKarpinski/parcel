@@ -191,7 +191,7 @@ pub fn show_package_info(paths: &Paths, name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn upgrade_packages(paths: &Paths, requested: Option<&str>, yes: bool) -> Result<()> {
+pub fn update_packages(paths: &Paths, requested: Option<&str>, yes: bool) -> Result<()> {
     let db = load_database(paths)?;
     if db.packages.is_empty() {
         println!("no packages installed");
@@ -207,7 +207,7 @@ pub fn upgrade_packages(paths: &Paths, requested: Option<&str>, yes: bool) -> Re
             continue;
         };
         if is_newer(&candidate.version, &package.version) {
-            plans.push(UpgradePlan {
+            plans.push(UpdatePlan {
                 installed: package.clone(),
                 candidate,
             });
@@ -221,7 +221,7 @@ pub fn upgrade_packages(paths: &Paths, requested: Option<&str>, yes: bool) -> Re
     }
 
     if plans.is_empty() {
-        println!("nothing to upgrade");
+        println!("nothing to update");
         return Ok(());
     }
 
@@ -239,7 +239,7 @@ pub fn upgrade_packages(paths: &Paths, requested: Option<&str>, yes: bool) -> Re
         );
     }
 
-    if !yes && !confirm("Proceed with upgrade? [y/N] ")? {
+    if !yes && !confirm("Proceed with update? [y/N] ")? {
         println!("aborted");
         return Ok(());
     }
@@ -254,7 +254,7 @@ pub fn upgrade_packages(paths: &Paths, requested: Option<&str>, yes: bool) -> Re
         let mut temp = NamedTempFile::new().context("create temporary package file")?;
         temp.write_all(&bytes)
             .context("write downloaded package to temporary file")?;
-        prepared.push(PreparedUpgrade {
+        prepared.push(PreparedUpdate {
             installed: plan.installed,
             remote_name: plan.candidate.remote_name,
             package_file: temp,
@@ -269,12 +269,12 @@ pub fn upgrade_packages(paths: &Paths, requested: Option<&str>, yes: bool) -> Re
     Ok(())
 }
 
-struct UpgradePlan {
+struct UpdatePlan {
     installed: InstalledPackage,
     candidate: crate::repositories::PackageCandidate,
 }
 
-struct PreparedUpgrade {
+struct PreparedUpdate {
     installed: InstalledPackage,
     remote_name: String,
     package_file: NamedTempFile,
