@@ -1,5 +1,5 @@
-use blake2::{Blake2b512, Digest};
 use anyhow::{Result, bail};
+use blake2::{Blake2b512, Digest};
 
 /// Compute the Blake2b-512 hash of the given bytes and verify it against the expected hex string.
 pub fn verify_blake2b(bytes: &[u8], expected_hex: &str) -> Result<()> {
