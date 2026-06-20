@@ -14,7 +14,7 @@ use crate::{
     parcel_manifest::ParcelManifest,
     utils::{
         arch::{Architecture, get_architecture},
-        hash::verify_file_checksum,
+        hash::{hash_file_blake2b, verify_file_checksum},
     },
 };
 
@@ -321,15 +321,21 @@ fn create_parcel_package(manifest: &ParcelManifest, build_dir: &BuildDir) -> Res
 
     println!("Created parcel package: {}", parcel_path.display());
 
-    // TODO: compute hash
+    let hash = hash_file_blake2b(&parcel_path)?;
+    println!("Package hash (BLAKE2b-512): {hash}");
+
+    let hash_path = build_dir.output.join(format!("{parcel_filename}.b2sum"));
+    let hash_content = format!("{hash}  {parcel_filename}\n");
+    fs::write(&hash_path, &hash_content)
+        .with_context(|| format!("write hash to {}", hash_path.display()))?;
+    println!("Package hash saved to: {}", hash_path.display());
 
     Ok(())
 }
 
 fn compress_payload_tar(payload_dir: &Path, output_path: &Path) -> Result<()> {
     let file =
-        File::create(output_path)
-            .with_context(|| format!("create {}", output_path.display()))?;
+        File::create(output_path).with_context(|| format!("create {}", output_path.display()))?;
     let mut encoder = zstd::Encoder::new(file, 0).context("create zstd encoder")?;
     {
         let mut tar = tar::Builder::new(&mut encoder);
