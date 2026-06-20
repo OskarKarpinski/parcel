@@ -1,6 +1,5 @@
 //! Build `.parcel` packages from package build manifests.
 
-use core::arch;
 use std::{
     collections::BTreeMap,
     fs::{self, File},
@@ -61,7 +60,7 @@ struct SourceSpec {
 
 /// Build `.parcel` archive for package manifest.
 pub fn build_package(args: &BuildArgs) -> Result<()> {
-    let manifest_path = resolve_manifest(&Path::new(&args.manifest))?;
+    let manifest_path = resolve_manifest(Path::new(&args.manifest))?;
     println!(
         "Preparing to build package from {}",
         manifest_path.display()
@@ -122,6 +121,11 @@ pub fn build_package(args: &BuildArgs) -> Result<()> {
     };
 
     create_parcel_package(&archive_manifest, &build_dir)?;
+
+    // TODO: delta
+    if build_manifest.delta {
+        println!("TODO: delta");
+    }
 
     Ok(())
 }
