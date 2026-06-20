@@ -3,7 +3,6 @@
 use std::{
     collections::BTreeMap,
     fs::{self, File},
-    io::Cursor,
     path::{Path, PathBuf},
 };
 
@@ -302,9 +301,9 @@ fn create_parcel_package(manifest: &ParcelManifest, build_dir: &BuildDir) -> Res
     );
     let parcel_path = build_dir.output.join(&parcel_filename);
 
-    // Package the output directory into data.tar.zst
-    let payload_tar = create_payload_tar(&build_dir.output)?;
-    let compressed_payload = compress_payload(payload_tar)?;
+    // Stream output directory through tar → zstd directly to a temp file
+    let compressed_payload_path = build_dir.build_root.join("data.tar.zst");
+    compress_payload_tar(&build_dir.output, &compressed_payload_path)?;
 
     // Create the final parcel package
     let file = File::create(&parcel_path)?;
@@ -314,8 +313,11 @@ fn create_parcel_package(manifest: &ParcelManifest, build_dir: &BuildDir) -> Res
         "manifest.yml",
         serde_yaml::to_string(manifest)?.as_bytes(),
     )?;
-    append_bytes_tar(&mut outer, "data.tar.zst", &compressed_payload)?;
+    append_file_tar(&mut outer, "data.tar.zst", &compressed_payload_path)?;
     outer.finish().context("finish parcel package archive")?;
+
+    // Clean up temp file
+    let _ = fs::remove_file(&compressed_payload_path);
 
     println!("Created parcel package: {}", parcel_path.display());
 
@@ -324,15 +326,36 @@ fn create_parcel_package(manifest: &ParcelManifest, build_dir: &BuildDir) -> Res
     Ok(())
 }
 
-fn create_payload_tar(payload_dir: &Path) -> Result<Vec<u8>> {
-    let mut tar = tar::Builder::new(Vec::new());
-    tar.append_dir_all(".", payload_dir)
-        .with_context(|| format!("create payload tar from {}", payload_dir.display()))?;
-    tar.into_inner().context("finish payload tar")
+fn compress_payload_tar(payload_dir: &Path, output_path: &Path) -> Result<()> {
+    let file =
+        File::create(output_path)
+            .with_context(|| format!("create {}", output_path.display()))?;
+    let mut encoder = zstd::Encoder::new(file, 0).context("create zstd encoder")?;
+    {
+        let mut tar = tar::Builder::new(&mut encoder);
+        tar.append_dir_all(".", payload_dir)
+            .with_context(|| format!("create payload tar from {}", payload_dir.display()))?;
+        tar.finish().context("finish payload tar")?;
+    }
+    encoder.finish()?;
+    Ok(())
 }
 
-fn compress_payload(payload_tar: Vec<u8>) -> Result<Vec<u8>> {
-    zstd::encode_all(Cursor::new(payload_tar), 0).context("compress payload tar with zstd")
+fn append_file_tar<W: std::io::Write>(
+    builder: &mut tar::Builder<W>,
+    path: &str,
+    file_path: &Path,
+) -> Result<()> {
+    let file = File::open(file_path)?;
+    let metadata = file.metadata()?;
+    let mut header = tar::Header::new_gnu();
+    header.set_size(metadata.len());
+    header.set_mode(0o644);
+    header.set_cksum();
+    builder
+        .append_data(&mut header, path, file)
+        .with_context(|| format!("append {path} to package archive"))?;
+    Ok(())
 }
 
 fn append_bytes_tar<W: std::io::Write>(
