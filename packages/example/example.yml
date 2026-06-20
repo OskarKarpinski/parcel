@@ -1,12 +1,12 @@
 name: example
 version: 1.0.0
+release: 1
 description: Example parcel package
 architecture:
   - x86_64
   - aarch64
 
 delta: false
-compression: zstd # zstd or xz (default zstd)
 
 source:
   # - https://example.com/test.tar.gz
@@ -19,6 +19,7 @@ source:
 #   - https://example.com/bin-aarch64.zip:abc123...
 
 build_script: |
+  echo "Test file in build root" > test.txt
   echo "Building..."
   echo "#!/bin/bash" > example.sh
   echo "echo \"Hello World\"" >> example.sh

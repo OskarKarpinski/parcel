@@ -1,22 +1,21 @@
 # Parcel Package Specification
 
-This document describes the package, build-manifest, repository-index, and
-user-state formats used by Parcel.
+This document describes the package archive and build-manifest formats used by
+Parcel.
 
-Parcel is a user-space Linux package manager. It installs application payloads
-under the current user's home directory and exposes selected files into standard
-XDG locations such as `$HOME/.local/bin` and
-`$HOME/.local/share/applications`.
+Parcel currently builds user-space Linux package archives for desktop
+applications and developer tools.
 
 ## Status
 
-This specification documents the currently implemented format.
+This specification documents the currently implemented build format.
 
-- Package archives with `.parcel` extension are supported.
+- Building package archives with `.parcel` extension is supported.
 - Payload compression supports `zstd` and `xz`.
-- Build manifests are YAML files consumed by `parcel build` when Parcel is
-  compiled with the `build` feature.
-- Remote repository indexes are zstd-compressed JSON documents.
+- Build manifests are YAML files consumed by `parcel build`.
+- Archive install actions are emitted into package metadata for consumers that
+  install `.parcel` archives.
+- Remote repository indexes are reserved as zstd-compressed JSON documents.
 - Delta packages are reserved in the repository and build formats, but package
   generation and installation for deltas are not implemented.
 
@@ -58,8 +57,8 @@ Common values are:
 - `x86_64`
 - `aarch64`
 
-Install rejects a package whose archive manifest `arch` does not match the
-current machine architecture.
+Package consumers should reject an archive whose manifest `arch` does not match
+the current machine architecture.
 
 ## Package Archive Format
 
@@ -302,12 +301,13 @@ files:
 Parcel validates that each declared source exists in `OUTPUT_DIR` after
 `install_script` completes.
 
-## Remote Repository Format
+## Reserved Remote Repository Format
 
-A Parcel remote serves a zstd-compressed JSON repository index named
+The remote repository format is reserved for future package-manager support. A
+Parcel remote serves a zstd-compressed JSON repository index named
 `parcel-index.db`.
 
-When a remote URL is added:
+When remote support is implemented, remote URLs should be normalized as follows:
 
 - If the URL already ends with `parcel-index.db`, Parcel uses it directly.
 - If the URL contains `github.com/`, Parcel appends
@@ -357,33 +357,9 @@ Download templates currently expand:
 - `{version}`: full package version.
 - `{arch}`: current machine architecture.
 
-During remote install or update, Parcel downloads the selected package archive
-and verifies it against the checksum stored in `versions`.
-
-## User State
-
-Parcel stores user state under:
-
-```text
-$HOME/.local/share/parcel/
-```
-
-Current layout:
-
-```text
-$HOME/.local/share/parcel/apps/<name>/<version>/
-$HOME/.local/share/parcel/parcel.db
-$HOME/.local/share/parcel/remotes.json
-$HOME/.local/share/parcel/indexes/<remote>.db
-```
-
-`parcel.db` is a zstd-compressed JSON package database. It records installed
-packages, install paths, applied actions, installed payload file paths, source
-remote names, and install timestamps.
-
-`remotes.json` is a pretty-printed JSON remote configuration file.
-
-`indexes/<remote>.db` stores cached zstd-compressed JSON repository indexes.
+When remote install or update support is implemented, Parcel should download the
+selected package archive and verify it against the checksum stored in
+`versions`.
 
 ## Security Rules
 
@@ -391,9 +367,9 @@ Parcel enforces these rules in the current implementation:
 
 - Package payload paths must be relative and must not contain `..`.
 - Build-manifest action sources must be relative and must not contain `..`.
-- Install actions refuse to overwrite existing target paths.
-- Remote package downloads are checked with BLAKE2b-512 when installed from a
-  repository index.
+- Package consumers should refuse to overwrite existing target paths when
+  applying install actions.
+- Remote package downloads should be checked with BLAKE2b-512 when installed
+  from a repository index.
 - Build sources are checked with BLAKE2b-512 only when a checksum suffix is
   provided.
-
