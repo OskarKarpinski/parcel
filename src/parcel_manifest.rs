@@ -10,7 +10,7 @@ pub struct ParcelManifest {
     pub version: String,
     pub release: usize,
     pub description: String,
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub homepage: Option<String>,
     pub architecture: Architecture,
     pub files: BTreeMap<String, Vec<String>>,

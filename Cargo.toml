@@ -2,7 +2,7 @@
 name = "parcel"
 version = "0.1.0"
 edition = "2024"
-description = "A Linux user-space package archive builder for desktop applications and developer tools."
+description = "A Linux user-space package manager for desktop applications and developer tools."
 
 [dependencies]
 anyhow = "1.0"
@@ -13,7 +13,5 @@ hex = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tar = "0.4"
-tempfile = "3.10"
-ureq = { version = "2.10", features = ["tls"] }
 walkdir = "2.5"
 zstd = "0.13"

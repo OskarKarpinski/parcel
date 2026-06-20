@@ -6,8 +6,6 @@ architecture:
   - x86_64
   - aarch64
 
-delta: false
-
 source:
   # - https://example.com/test.tar.gz
   - ./example.desktop

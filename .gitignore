@@ -1,4 +1,3 @@
-# Cargo build output
+/.idea
 /target
-
 *.parcel

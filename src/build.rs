@@ -25,21 +25,16 @@ struct BuildManifest {
     version: String,
     release: usize,
     description: String,
-    #[serde(default)]
     homepage: Option<String>,
-    #[serde(default)]
     architecture: Vec<Architecture>,
     #[serde(default)]
     delta: bool,
-    #[serde(default)]
     source: Vec<String>,
     #[serde(default, rename = "source-x86-64", alias = "source-x86_64")]
     source_x86_64: Vec<String>,
     #[serde(default, rename = "source-aarch64")]
     source_aarch64: Vec<String>,
-    #[serde(default)]
     build_script: Option<String>,
-    #[serde(default)]
     install_script: Option<String>,
     #[serde(default)]
     files: BTreeMap<String, Vec<String>>,
