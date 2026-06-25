@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 description = "A Linux user-space package manager for desktop applications and developer tools."
 
+[features]
+default = ["build"]
+build = []
+
 [dependencies]
 anyhow = "1.0"
 blake2 = "0.10"

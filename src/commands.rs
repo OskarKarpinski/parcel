@@ -1,15 +1,15 @@
-//! Top-level command dispatch.
-
 use anyhow::Result;
 use clap::Parser;
 
-use crate::build::build_package;
 use crate::cli::{Cli, Command};
 
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Build(args) => build_package(&args),
+        Command::Install(args) => crate::install::install_package(&args),
+        Command::Remove => todo!("Implement package removal"),
+        #[cfg(feature = "build")]
+        Command::Build(args) => crate::build::build_package(&args),
     }
 }

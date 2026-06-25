@@ -9,10 +9,23 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Install a package from repository or local path.
+    Install(InstallArgs),
+    /// Remove a package from the system.
+    Remove,
+    #[cfg(feature = "build")]
     /// Build a .parcel archive from a package build manifest.
     Build(BuildArgs),
 }
 
+#[cfg(feature = "build")]
+#[derive(Debug, Args)]
+pub struct InstallArgs {
+    /// Package name or path to a .parcel archive file.
+    pub package: String,
+}
+
+#[cfg(feature = "build")]
 #[derive(Debug, Args)]
 pub struct BuildArgs {
     /// Path to a package directory or build manifest YAML file.

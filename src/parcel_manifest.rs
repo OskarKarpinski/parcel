@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::arch::Architecture;
 
+#[cfg(feature = "build")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ParcelManifest {
     pub name: String,
