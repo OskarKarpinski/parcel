@@ -2,7 +2,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Architecture {
     #[serde(rename = "x86_64")]
     X86_64,
@@ -19,7 +19,13 @@ impl fmt::Display for Architecture {
     }
 }
 
-// TODO: implement
 pub fn get_architecture() -> Architecture {
-    Architecture::X86_64
+    match std::env::consts::ARCH {
+        "x86_64" => Architecture::X86_64,
+        "aarch64" => Architecture::AARCH64,
+        other => {
+            eprintln!("warning: unsupported host architecture {other}, defaulting to x86_64");
+            Architecture::X86_64
+        }
+    }
 }

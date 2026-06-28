@@ -1,16 +1,20 @@
 # Parcel
 
-Parcel builds Linux user-space package archives for desktop applications and
-developer tools.
+Parcel is a Linux user-space package manager for desktop applications and
+developer tools, with a Homebrew-like cellar layout and repository-driven
+binary installs.
 
 The detailed package format specification lives in [Parcel.md](Parcel.md).
 
 ## Status
 
-Parcel currently supports building `.parcel` archives from YAML package
-manifests.
+Parcel currently supports:
 
-Delta packages are reserved in the format but are not implemented yet.
+- building `.parcel` archives from YAML package manifests
+- building `.delta.parcel` overlay updates between package versions
+- generating static `parcel-index.db` repository indexes
+- adding repositories, caching indexes, searching packages, showing info
+- installing, upgrading, listing, and removing user-space packages
 
 ## Install From Source
 
@@ -35,8 +39,27 @@ cargo run -- --help
 ## Command Overview
 
 ```bash
+parcel repo add <name> <url>
+parcel update
+parcel search <query>
+parcel info <name>
+parcel install <name> [--version <ver>]
+parcel install </path/to/package.parcel>
+parcel upgrade [<name>]
+parcel list
+parcel remove <name>
 parcel build [options] <manifest-or-package-dir>
+parcel build-delta --from <old.parcel> --to <new.parcel>
+parcel repo index <artifacts-dir> --base-url <base-url-or-path>
 ```
+
+Installed packages live under XDG directories:
+
+- `$XDG_DATA_HOME/parcel/cellar/<name>/<version>/`
+- `$XDG_DATA_HOME/parcel/opt/<name>`
+- `$XDG_STATE_HOME/parcel/receipts/<name>.json`
+- `$XDG_CACHE_HOME/parcel/indexes/`
+- `$XDG_CONFIG_HOME/parcel/repos.d/`
 
 ## Build A Package
 
@@ -47,8 +70,8 @@ can be built with:
 cargo run -- build packages/example
 ```
 
-By default, Parcel writes the built archive into the same directory as the
-package manifest. The generated archive name follows:
+By default, Parcel writes the built archive into the build workspace. The
+generated archive name follows:
 
 ```text
 <name>-<version>-<release>-<arch>.parcel
@@ -57,21 +80,46 @@ package manifest. The generated archive name follows:
 Example:
 
 ```text
-packages/example/example-1.0.0-1-x86_64.parcel
+.parcel/build/example/example-1.0.0-1-x86_64.parcel
 ```
 
 Useful build options:
 
 ```bash
 cargo run -- build packages/example --release 2
-cargo run -- build packages/example --arch x86_64
-cargo run -- build packages/example --output-dir /tmp/parcel-dist
 cargo run -- build packages/example --build-dir /tmp/parcel-build
 ```
 
 `--build-dir` selects where Parcel creates its temporary build workspace. Parcel
-creates a unique `parcel-build-*` directory inside that location and removes it
-after the build completes.
+stores sources, build artifacts, payload output, and the final `.parcel`
+archive there.
+
+## Build A Delta
+
+Generate an overlay delta between two built package archives:
+
+```bash
+cargo run -- build-delta \
+  --from .parcel/build/example/example-1.0.0-1-x86_64.parcel \
+  --to .parcel/build/example/example-1.1.0-1-x86_64.parcel
+```
+
+The output name follows:
+
+```text
+<name>-<from-version>-<to-version>-<arch>.delta.parcel
+```
+
+## Generate A Repository Index
+
+Create a static repository index from a directory containing `.parcel` and
+`.delta.parcel` artifacts:
+
+```bash
+cargo run -- repo index .parcel/build/example --base-url https://example.com/releases
+```
+
+For local development you can also use a filesystem path as `--base-url`.
 
 ## Build Manifest
 
@@ -166,8 +214,13 @@ manifest.yml
 data.tar.zst
 ```
 
-`data.tar.xz` is also supported when the build manifest uses
-`compression: xz`.
+A `.delta.parcel` file contains:
+
+```text
+delta.yml
+manifest.yml
+delta-data.tar.zst
+```
 
 Install actions in `manifest.yml` describe which payload files should be linked
 or copied by consumers that install `.parcel` archives.
